@@ -8,6 +8,7 @@ import { setTextureScale } from './medialib.js';
 import { CustomizePanel } from './ui/customize.js';
 import { iconStyle, popover, toast } from './ui/widgets.js';
 import { Social, SHOP, GOLD_RULES } from './social.js';
+import { PaperBuddies, pagesToPDF } from './paper.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -23,11 +24,18 @@ const settings = Object.assign({ name: 'Buddy', fps: 0, texScale: 2, bg: 'white'
 const saveSettings = () => store.set('settings', settings);
 
 // Category bit -> [label, icon index]. "All" uses the spiral icon.
-const MOOD_CATS = [[0, 'All moods', 93], [2, 'Feelings', 84], [1, 'Activities', 72], [4, 'Moody', 77], [8, 'Sports', 99], [16, 'Dance', 14], [32, 'Music', 35], [64, 'Holiday', 55]];
-const POKE_CATS = [[0, 'All pokes', 93], [2, 'Love', 68], [1, 'Activities', 72], [4, 'Fight', 50], [8, 'Sports', 99], [16, 'Dance', 14], [32, 'Music', 35], [64, 'Holiday', 55]];
+const MOOD_CATS = [[0, 'All moods', 93], [2, 'Feelings', 84], [1, 'Activities', 72], [4, 'Moody', 77], [8, 'Sports', 99], [16, 'Dance', 14], [32, 'Music', 35], [64, 'Holiday', 55], [128, 'Special', 40]];
+const POKE_CATS = [[0, 'All pokes', 93], [2, 'Love', 68], [1, 'Activities', 72], [4, 'Fight', 50], [8, 'Sports', 99], [16, 'Dance', 14], [32, 'Music', 35], [64, 'Holiday', 55], [128, 'Special', 40]];
 
 // Background pattern layers that must be bought in the Gold shop.
 const LOCKED_LAYERS = { bg2: 'bkg-stripes', bg3: 'bkg-icons', bg4: 'bkg-rainbow' };
+
+// Premium moods/pokes: the July 2009 data marks them with cost (in coins)
+// and pid; they were bought once with gold. Coins are scaled to our gold.
+const GOLD_PER_COIN = 10;
+const premiumId = (item) => (item.cost && item.free !== '1' ? 'p' + (item.pid || item.id) : null);
+const premiumPrice = (item) => Number(item.cost) * GOLD_PER_COIN;
+const isUnlocked = (item) => { const id = premiumId(item); return !id || social.owns(id); };
 
 const LOCK_SVG = '<svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true"><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="#c9c9c9" stroke-width="1.6"/><rect x="1.5" y="7" width="11" height="8" rx="1.5" fill="#e4e4e4" stroke="#c9c9c9"/></svg>';
 
@@ -58,7 +66,8 @@ applyBackground();
 let social = null;
 let customizePanel = null;
 let activeTab = 'mood';
-let myMood = store.get('myMood', { id: MOODS.list[0].id, comment: '' });
+const firstMood = () => (MOODS.list.find((m) => m.id === 'm_hppy') || MOODS.list[0]).id;
+let myMood = store.get('myMood', { id: 'm_hppy', comment: '' });
 let view = null;            // what the stage shows: {kind, ...}
 let preview = null;         // selected (not yet saved) mood/poke in the lists
 let selectedFriendId = store.get('selFriend', null);
@@ -166,12 +175,16 @@ function buildList(ul, list, available, onPick, cat, type) {
     li.dataset.id = item.id;
     li.className = ok ? '' : 'locked';
     li.title = ok ? item.desc.replace('%', type === 'poke' ? (friend() ? friend().name : 'your friend') : settings.name) : 'Locked: this animation was streamed from MySpace servers that no longer exist.';
-    li.innerHTML = `<span class="lock">${ok ? '' : LOCK_SVG}</span><span class="radio"></span><i class="ico" style="${iconStyle(Number(item.icon) || 0)}"></i><span class="name">${esc(item.name)}</span>`;
+    const needsGold = ok && !isUnlocked(item);
+    const price = needsGold ? `<span class="price"><i class="coin sm"></i>${premiumPrice(item)}</span>` : '';
+    li.innerHTML = `<span class="lock">${ok ? '' : LOCK_SVG}</span><span class="radio"></span><i class="ico" style="${iconStyle(Number(item.icon) || 0)}"></i><span class="name">${esc(item.name)}</span>${price}`;
+    if (needsGold) li.title = `Unlock “${item.name}” for ${premiumPrice(item)} gold. Once unlocked, you may use it as many times as you like.`;
     if (ok) {
       li.tabIndex = 0;
       li.setAttribute('role', 'radio');
-      li.addEventListener('click', () => onPick(item.id));
-      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(item.id); } });
+      const pick = () => (isUnlocked(item) ? onPick(item.id) : offerUnlock(item, () => onPick(item.id)));
+      li.addEventListener('click', pick);
+      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
     }
     ul.appendChild(li);
   }
@@ -182,6 +195,20 @@ let moodCat = () => 0;
 let pokeCat = () => 0;
 const refreshMoodList = () => buildList($('#mood-list'), MOODS.list, (m) => renderer.moodAvailable(m), previewMood, moodCat(), 'mood');
 const refreshPokeList = () => buildList($('#poke-list'), POKES.list, (p) => renderer.pokeAvailable(p), previewPoke, pokeCat(), 'poke');
+
+// The original BuyFeatureWindow: confirm, pay, then use it forever.
+function offerUnlock(item, then) {
+  const price = premiumPrice(item);
+  if (social.gold < price) {
+    toast(`“${item.name}” costs ${price} gold. You need ${price - social.gold} more.`, { label: 'Get gold', onClick: () => showTab('gold') });
+    return;
+  }
+  if (!confirm(`Unlock “${item.name}” for ${price} gold?\nOnce unlocked, you may use it as many times as you like.`)) return;
+  social.unlock(premiumId(item), price, item.name);
+  refreshMoodList();
+  refreshPokeList();
+  then();
+}
 
 function markCurrent() {
   const moodSel = preview && preview.type === 'mood' ? preview.id : myMood.id;
@@ -474,6 +501,7 @@ async function enterCustomize() {
 }
 
 function leaveCustomizeStage() {
+  view = null; // force the next view to be re-applied (and the status line updated)
   stage.classList.remove('examine');
   $('#stage-hint').hidden = true;
   renderer.endCustomize();
@@ -494,6 +522,34 @@ async function saveAppearance() {
   }
   $('#set-code').value = me;
 }
+
+// Preset buddies from the Customization window (PresetsWindow).
+let presets = null;
+$('#app-presets').addEventListener('click', async (e) => {
+  const anchor = e.currentTarget;
+  if (!presets) presets = await fetch('assets/presets.json').then((r) => r.json()).catch(() => []);
+  const wrap = document.createElement('div');
+  wrap.innerHTML = '<h3>Choose a preset</h3>';
+  const grid = document.createElement('div');
+  grid.className = 'preset-grid';
+  for (const p of presets) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<img alt=""><span>${esc(p.name)}</span>`;
+    b.addEventListener('click', async () => {
+      popover.close();
+      await targetBuddy().deserializeCompressed(p.code);
+      customizePanel.refresh();
+      saveAppearance();
+      toast('Preset applied: ' + p.name);
+    });
+    grid.appendChild(b);
+  }
+  wrap.appendChild(grid);
+  popover.open(anchor, wrap);
+  // Portraits render one at a time in the background.
+  [...grid.children].forEach((b, i) => setFace(b.querySelector('img'), presets[i].code));
+});
 
 $('#app-random').addEventListener('click', async () => {
   await targetBuddy().deserializeCompressed(await randomCode());
@@ -561,6 +617,32 @@ function renderGold() {
     }
     shop.appendChild(li);
   }
+  const prem = $('#premium');
+  prem.innerHTML = '';
+  const items = [...MOODS.list.map((m) => ['mood', m]), ...POKES.list.map((p) => ['poke', p])]
+    .filter(([t, it]) => premiumId(it) && (t === 'mood' ? renderer.moodAvailable(it) : renderer.pokeAvailable(it)));
+  for (const [type, it] of items) {
+    const li = document.createElement('li');
+    const owned = social.owns(premiumId(it));
+    li.innerHTML = `<i class="ico" style="${iconStyle(Number(it.icon) || 0)}"></i><span class="txt">${esc(it.name)}<small>${type === 'mood' ? 'Mood' : 'Poke'}</small></span>` +
+      (owned ? '<span class="owned">Unlocked</span>' : `<span class="price"><i class="coin sm"></i>${premiumPrice(it)}</span><button class="bp-btn">Unlock</button>`);
+    const btn = li.querySelector('button');
+    if (btn) {
+      btn.disabled = social.gold < premiumPrice(it);
+      btn.addEventListener('click', () => offerUnlock(it, () => toast(`${it.name} unlocked!`)));
+    }
+    prem.appendChild(li);
+  }
+  {
+    const li = document.createElement('li');
+    const owned = social.owns('paperbuddies');
+    li.innerHTML = `<i class="ico" style="${iconStyle(71)}"></i><span class="txt">3D Paper Buddies<small>Print, cut and fold your buddy (Create tab)</small></span>` +
+      (owned ? '<span class="owned">Unlocked</span>' : `<span class="price"><i class="coin sm"></i>${PAPER_PRICE}</span><button class="bp-btn">Unlock</button>`);
+    const btn = li.querySelector('button');
+    if (btn) { btn.disabled = social.gold < PAPER_PRICE; btn.addEventListener('click', () => { if (confirm(`Unlock 3D Paper Buddies for ${PAPER_PRICE} gold?`)) social.unlock('paperbuddies', PAPER_PRICE, '3D Paper Buddies'); }); }
+    prem.appendChild(li);
+  }
+  $('#premium-title').hidden = false;
   $('#earn').innerHTML = [
     ['Daily bonus', `+${GOLD_RULES.daily}`],
     ['Poke a friend', `+${GOLD_RULES.pokeSent} (${GOLD_RULES.pokeSentCap}× a day)`],
@@ -628,7 +710,7 @@ async function renderComic() {
     const [type, id] = p.action.split(':');
     const x = pad + i * (pw + pad), y = pad;
     let action = { type, id };
-    if (type === 'poke' && !withFriend) action = { type: 'mood', id: MOODS.list[0].id };
+    if (type === 'poke' && !withFriend) action = { type: 'mood', id: firstMood() };
     const still = renderer.renderStill(action, p.frac, p.zoom, Math.round(pw * 2), Math.round(ph * 2));
     if (still) ctx.drawImage(still, x, y, pw, ph);
     ctx.lineWidth = 3;
@@ -669,7 +751,73 @@ function drawBubble(ctx, text, x, y, maxW) {
   lines.forEach((l, i) => ctx.fillText(l, x + 14, y + 6 + lh * (i + 0.85)));
 }
 
+// 3D Paper Buddies (Create window). The original unlocked it for 180 coins.
+const PAPER_PRICE = 180;
+let paper = null;
+let paperPages = null;
+
+function updatePaperPrice() {
+  const owned = social.owns('paperbuddies');
+  $('#paper-price').innerHTML = owned ? 'Unlocked: create as many as you like.' : `Unlock for <i class="coin sm"></i>${PAPER_PRICE} gold. Pay once, create thousands!`;
+  $('#paper-save').textContent = owned ? 'Save and print' : 'Unlock this feature';
+}
+
+async function previewPaper() {
+  paper = paper || new PaperBuddies(renderer);
+  paper.pose = Number(($('input[name=paper-pose]:checked') || {}).value || 0);
+  const status = $('#paper-status');
+  status.hidden = false;
+  status.textContent = 'Loading paper buddy…';
+  $('#paper-pages').innerHTML = '';
+  await setCast(myCode(), cast.b2);
+  const saved = view;
+  paperPages = await paper.build(renderer.buddy1, (d, t) => { status.textContent = `Creating page ${d} of ${t}…`; });
+  status.hidden = paperPages.length > 0;
+  if (!paperPages.length) status.textContent = 'Nothing to print.';
+  for (const pg of paperPages) {
+    const f = document.createElement('figure');
+    const img = new Image();
+    img.src = pg.canvas.toDataURL('image/jpeg', 0.7);
+    f.appendChild(img);
+    const cap = document.createElement('figcaption');
+    cap.textContent = pg.name.replace(/_/g, ' ');
+    f.appendChild(cap);
+    g(f);
+  }
+  function g(f) { $('#paper-pages').appendChild(f); }
+  if (saved) showView(saved);
+}
+
+async function savePaper() {
+  if (!social.owns('paperbuddies')) {
+    if (social.gold < PAPER_PRICE) return toast(`3D Paper Buddies costs ${PAPER_PRICE} gold. You need ${PAPER_PRICE - social.gold} more.`, { label: 'Get gold', onClick: () => showTab('gold') });
+    if (!confirm(`Unlock 3D Paper Buddies for ${PAPER_PRICE} gold?\nOnce unlocked, you may use this feature as many times as you like.`)) return;
+    social.unlock('paperbuddies', PAPER_PRICE, '3D Paper Buddies');
+    updatePaperPrice();
+  }
+  if (!paperPages) await previewPaper();
+  if (!paperPages || !paperPages.length) return;
+  toast('Creating PDF…');
+  const pdf = await pagesToPDF(paperPages.map((p) => p.canvas));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(pdf);
+  a.download = 'paperbuddy.pdf';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  toast('Save your Paper Buddy, then print, cut and fold!');
+}
+
 function initCreate() {
+  for (const b of $$('#create-tabs button')) {
+    b.addEventListener('click', () => {
+      for (const c of $$('#create-tabs button')) c.setAttribute('aria-selected', String(c === b));
+      for (const p of $$('[data-create-panel]')) p.hidden = p.dataset.createPanel !== b.dataset.create;
+      if (b.dataset.create === 'paper') updatePaperPrice();
+    });
+  }
+  $('#paper-preview').addEventListener('click', previewPaper);
+  $('#paper-save').addEventListener('click', savePaper);
+  for (const r of $$('input[name=paper-pose]')) r.addEventListener('change', () => { if (paperPages) previewPaper(); });
   buildComicEditor();
   $('#comic-render').addEventListener('click', renderComic);
   $('#comic-friend').addEventListener('change', renderComic);
@@ -839,7 +987,7 @@ async function boot() {
     initStage();
     initPictures();
     updateUnread();
-    if (!moodDef(myMood.id) || !renderer.moodAvailable(moodDef(myMood.id))) myMood = { id: MOODS.list[0].id, comment: '' };
+    if (!moodDef(myMood.id) || !renderer.moodAvailable(moodDef(myMood.id))) myMood = { id: firstMood(), comment: '' };
     showMyMood();
     social.start();
     if (social.data.unread) toast(`You have ${social.data.unread} new poke${social.data.unread > 1 ? 's' : ''}`, { label: 'Show', onClick: () => showTab('home') });

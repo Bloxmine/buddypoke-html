@@ -23,8 +23,11 @@ export class MediaLibrary {
     this.symbolCanvasCache = new Map();
   }
 
-  async init(swfBytes, libraryJson) {
+  async init(swfBytes, libraryJson, iconSwfBytes = null) {
     this.swf = await SWF.load(swfBytes);
+    // Picker thumbnails (Icon_* / Char_* symbols). The July 2009 app keeps
+    // them in a separate SWF embedded in the Customization window.
+    this.iconSwf = iconSwfBytes ? await SWF.load(iconSwfBytes) : null;
     this.library = libraryJson;
     this.frameRate = this.swf.frameRate;
   }
@@ -278,8 +281,12 @@ export class MediaLibrary {
 
   // Icon thumbnail (CustomizationPanel.cacheToBitmap): fits the symbol
   // bounds into size x size.
+  hasIcon(name) { return (this.iconSwf && this.iconSwf.symbols.has(name)) || this.hasSymbol(name); }
+
   renderIcon(name, size = 36) {
-    const sym = this.getSymbol(name);
+    const swf = this.iconSwf && this.iconSwf.symbols.has(name) ? this.iconSwf : this.swf;
+    const id = swf.symbols.get(name);
+    const sym = id === undefined ? null : createInstance(swf, id);
     if (!sym) return null;
     const b = this.bounds(sym, IDENTITY_M);
     const c = makeCanvas(size * 2, size * 2);
@@ -288,7 +295,7 @@ export class MediaLibrary {
     const sc = Math.min((size * 2) / w, (size * 2) / h);
     const ctx = c.getContext('2d');
     const tx = (size * 2 - w * sc) / 2 - b.xmin * sc, ty = (size * 2 - h * sc) / 2 - b.ymin * sc;
-    renderDisplayObject(ctx, sym, { a: sc, b: 0, c: 0, d: sc, tx, ty }, IDENTITY_CX, this.swf);
+    renderDisplayObject(ctx, sym, { a: sc, b: 0, c: 0, d: sc, tx, ty }, IDENTITY_CX, swf);
     return c;
   }
 

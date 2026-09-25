@@ -5,6 +5,7 @@
 import { CUSTOMIZATION_OPTIONS } from '../data/options.js';
 import { xmlAttr, xmlChildren } from '../xml.js';
 import { popover } from './widgets.js';
+import { LAYER_DEPENDENCIES } from '../buddy.js';
 
 const ICON = 36;
 const hex = (v) => '#' + (v & 0xffffff).toString(16).padStart(6, '0');
@@ -98,16 +99,20 @@ export class CustomizePanel {
   // by material names instead of hard-coded indices.
   optionVisible(op) {
     const between = (id, a, b) => { const v = this.selIndex(id); return v >= a && v <= b; };
+    const hair = ['Hair', 'HairAfro', 'HairDread'].includes(this.headTopMaterial());
     switch (op.name) {
-      case 'Hair Color': case 'Hair Streak': return this.headTopMaterial() === 'Hair';
+      case 'Hair 2': case 'Hair Color': case 'Hair Strand': case 'Hair Streak': return hair;
       case 'Shaved Hair': return this.headTopMaterial() === 'Hair_Shave';
-      case 'Cap': case 'Cap 2': return this.headTopMaterial() === 'BCap';
+      case 'Cap': case 'Cap 2': return ['BCap', 'WHat'].includes(this.headTopMaterial());
       case 'High Belt Pattern': return between('blt', 1, 3);
       case 'Low Belt Pattern': return between('blt', 4, 6);
       case 'Sling Pattern': return between('sst', 1, 3);
       case 'Shoe Pattern': return this.selIndex('sst') === 4;
       case 'Boot Pattern': return this.selIndex('sst') === 5;
       case 'Skirt 2': case 'Skirt 3': return this.selIndex('ski') >= 1;
+      case 'Jersey #': return this.selIndex('sl2t') === 33;
+      case 'Jersey ##': return this.selIndex('sl2t') === 34;
+      case 'Jersey Line': return between('sl2t', 33, 34);
       default: return true;
     }
   }
@@ -184,7 +189,7 @@ export class CustomizePanel {
   icon(name) {
     let src = this.iconCache.get(name);
     if (src === undefined) {
-      src = this.lib.hasSymbol(name) ? this.lib.renderIcon(name, ICON) : null;
+      src = this.lib.hasIcon(name) ? this.lib.renderIcon(name, ICON) : null;
       this.iconCache.set(name, src);
     }
     const c = document.createElement('canvas');
@@ -258,17 +263,11 @@ export class CustomizePanel {
     const sel = this.selection(sub);
     if (!sel) return;
     if (sub.type === 'texture') {
-      // CustomizationPanel.layerDependencies: reset pattern layers that
-      // do not apply to the newly chosen shoe or belt.
-      if (sub.id === 'sst') {
-        if (i < 1 || i > 3) this.resetLayers(['sd1']);
-        if (i !== 4) this.resetLayers(['sd3', 'sh1']);
-        if (i !== 5) this.resetLayers(['sd5', 'sh3']);
-      } else if (sub.id === 'blt') {
-        if (i < 1 || i > 3) this.resetLayers(['hbp']);
-        if (i < 4 || i > 6) this.resetLayers(['lbp']);
-      }
+      // Buddy.deserialize / CustomizationPanel layerDependencies: reset
+      // pattern layers that do not apply to the new choice.
+      if (LAYER_DEPENDENCIES[sub.id]) b.resetLayers(LAYER_DEPENDENCIES[sub.id](i));
       sel.layer.setAttribute('textureIndex', String(i));
+      for (const copy of sub.copies || []) { const l = b.findLayer(copy); if (l) l.setAttribute('textureIndex', String(i)); }
     } else if (sub.type === 'color') {
       sel.tex.parentNode.setAttribute('colorIndex', String(i));
       sel.tex.setAttribute('colorSelection', String(i));
@@ -278,18 +277,15 @@ export class CustomizePanel {
       }
     } else if (sub.type === 'itemGroup') {
       sel.items.forEach((it, k) => it.setAttribute('visible', k === i ? 'true' : 'false'));
+      for (const copy of sub.copies || []) {
+        const [cat, grp] = copy.split(';');
+        b.findGroupItems(cat, grp).forEach((it, k) => it.setAttribute('visible', k === i ? 'true' : 'false'));
+      }
+      if (LAYER_DEPENDENCIES[sub.id]) b.resetLayers(LAYER_DEPENDENCIES[sub.id](i));
     } else if (sub.type === 'item') {
       sel.item.setAttribute('visible', i === 1 ? 'true' : 'false');
     }
     this.commit();
-  }
-
-  resetLayers(ids) {
-    for (const op of CUSTOMIZATION_OPTIONS) for (const sub of op.items) {
-      if (!ids.includes(sub.id)) continue;
-      const layer = this.buddy.findLayer(sub.path);
-      if (layer) layer.setAttribute('textureIndex', '0');
-    }
   }
 
   commit() {

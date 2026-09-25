@@ -72,6 +72,21 @@ await tab('create');
 await sleep(3500);
 await shot('create');
 
+// 3D Paper Buddies.
+await page.click('#create-tabs button[data-create=paper]');
+await page.click('#paper-preview');
+await page.waitForFunction('document.querySelectorAll("#paper-pages figure").length > 0', { timeout: 60000 });
+await sleep(500);
+await shot('paper');
+await page.click('#create-tabs button[data-create=comic]');
+
+// Presets.
+await tab('appearance');
+await page.click('#app-presets');
+await sleep(12000);
+await shot('presets');
+await page.keyboard.press('Escape');
+
 // Gold shop.
 await tab('gold');
 await shot('gold');

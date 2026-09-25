@@ -1,7 +1,8 @@
 # Extracts the data defined in the inner material SWF's document class
-# (dog.as frame1) into web/assets/library.json.
+# (dog.as frame1) into assets/library.json.
+#   python3 tools/build_library.py [path/to/dog.as]
 import re, json, sys
-src = open('extract/chick_swf/scripts/dog.as').read()
+src = open(sys.argv[1] if len(sys.argv) > 1 else 'extract/v2/pkg/chick_swf/scripts/dog.as').read()
 body = src[src.index('internal function frame1()'):]
 
 rects = {m.group(1): [int(v) for v in m.group(2, 3, 4, 5)] for m in re.finditer(r'(\w+ClipRect) = new Rectangle\((\d+),(\d+),(\d+),(\d+)\);', body)}

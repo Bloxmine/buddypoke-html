@@ -92,7 +92,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .cat-tabs { display: flex; gap: 1px; padding-left: 4px; margin-bottom: -1px; position: relative; z-index: 1; flex-wrap: wrap; }
 .cat-tabs button {
-  width: 44px; height: 42px; display: grid; place-items: center;
+  width: 40px; height: 40px; display: grid; place-items: center;
   border: 1px solid #c9c9c9; border-bottom-color: #bdbdbd; border-radius: 3px 3px 0 0;
   background: linear-gradient(#fff, #e2e2e2); cursor: pointer; padding: 0;
 }
@@ -203,7 +203,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   max-width: min(360px, calc(100vw - 16px)); max-height: min(380px, calc(100vh - 16px)); overflow: auto;
 }
 .popover h3 { margin: 0 0 6px; font: bold 11px Verdana, Tahoma, Arial, sans-serif; }
-.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 3px; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 3px; width: min(329px, calc(100vw - 40px)); }
 .icon-grid button { width: 44px; height: 44px; border: 1px solid #ccc; background: #fff; padding: 3px; cursor: pointer; display: grid; place-items: center; }
 .icon-grid button:hover { border-color: #5d86b8; }
 .icon-grid button[aria-pressed="true"] { border: 2px solid #4f7fbd; }
@@ -291,7 +291,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* create */
 .comic-preview { display: block; width: 100%; border: 1px solid #bdbdbd; background: #fff; margin-bottom: 8px; }
-.comic-box { height: 300px; }
+.comic-wrap { height: 420px; padding: 8px; }
+.comic-wrap .comic-preview { margin-bottom: 4px; }
 .comic-panel { display: grid; grid-template-columns: 22px 1fr; gap: 6px 8px; padding: 8px 10px; border-bottom: 1px dotted #ddd; align-items: center; font-size: 11px; }
 .comic-panel .num { grid-row: span 3; align-self: start; width: 22px; height: 22px; border-radius: 50%; background: #7a9cc6; color: #fff; font-weight: bold; display: grid; place-items: center; }
 .comic-panel select, .comic-panel input[type=text] { width: 100%; border: 1px solid #b5b5b5; padding: 3px; font-size: 11px; background: #fff; }
@@ -315,3 +316,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .toast { display: flex; align-items: center; gap: 10px; }
 .toast button { border: 0; background: #fff; color: #333; border-radius: 3px; padding: 2px 8px; font: bold 11px Verdana, sans-serif; cursor: pointer; }
 .gallery .del { border: 0; background: none; color: #b3261e; cursor: pointer; font-size: 10px; font-weight: bold; }
+
+.action-list .price { margin-left: auto; font: bold 11px Arial, sans-serif; color: #8a5a00; white-space: nowrap; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, 74px); gap: 4px; width: min(330px, calc(100vw - 40px)); }
+.preset-grid button { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid #ddd; background: #fff; padding: 3px 2px; cursor: pointer; font-size: 9px; color: #333; }
+.preset-grid button:hover { border-color: #5d86b8; }
+.preset-grid img { width: 48px; height: 48px; background: #f4f4f4; }
+.preset-grid span { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.paper-box { height: 420px; padding: 8px 10px; }
+.paper-intro { margin: 2px 0 8px; font: 12px Arial, sans-serif; color: #444; }
+.paper-pose { display: flex; gap: 10px; align-items: center; font: bold 11px Verdana, sans-serif; margin-bottom: 8px; }
+.paper-pose label { font-weight: normal; display: inline-flex; gap: 3px; align-items: center; }
+.paper-pages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.paper-pages figure { margin: 0; border: 1px solid #ddd; background: #fff; }
+.paper-pages img { display: block; width: 100%; }
+.paper-pages figcaption { font-size: 9px; color: #777; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

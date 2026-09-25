@@ -110,6 +110,7 @@
           </div>
           <div class="list-box tall"><div class="options" id="options"></div></div>
           <div class="panel-foot">
+            <button class="bp-btn" id="app-presets">Presets</button>
             <button class="bp-btn" id="app-random">Randomize</button>
             <button class="bp-btn" id="app-reset">Reset</button>
             <span class="spacer"></span>
@@ -117,16 +118,42 @@
           </div>
         </div>
 
-        <!-- Create: comic strips -->
+        <!-- Create: comic strips and 3D Paper Buddies -->
         <div class="panel" data-panel="create" hidden>
-          <h2>Create a comic strip:</h2>
-          <canvas class="comic-preview" id="comic-preview" width="1038" height="380"></canvas>
-          <div class="list-box comic-box" id="comic-panels"></div>
-          <div class="panel-foot">
-            <label class="check"><input type="checkbox" id="comic-friend" checked> Friend in pokes</label>
-            <span class="spacer"></span>
-            <button class="bp-btn" id="comic-render">Update preview</button>
-            <button class="bp-btn primary" id="comic-save">Save to Pictures</button>
+          <h2>Create:</h2>
+          <div class="sub-tabs" id="create-tabs">
+            <button data-create="comic" aria-selected="true">Comic strip</button>
+            <button data-create="paper">3D Paper Buddies</button>
+          </div>
+          <div data-create-panel="comic">
+            <div class="list-box comic-wrap">
+              <canvas class="comic-preview" id="comic-preview" width="1038" height="380"></canvas>
+              <div id="comic-panels"></div>
+            </div>
+            <div class="panel-foot">
+              <label class="check"><input type="checkbox" id="comic-friend" checked> Friend in pokes</label>
+              <span class="spacer"></span>
+              <button class="bp-btn" id="comic-render">Update preview</button>
+              <button class="bp-btn primary" id="comic-save">Save to Pictures</button>
+            </div>
+          </div>
+          <div data-create-panel="paper" hidden>
+            <div class="list-box paper-box">
+              <p class="paper-intro">Print your buddy, cut it out and fold it into a real 3D paper buddy.</p>
+              <div class="paper-pose">Pose:
+                <label><input type="radio" name="paper-pose" value="0" checked> 1</label>
+                <label><input type="radio" name="paper-pose" value="1"> 2</label>
+                <label><input type="radio" name="paper-pose" value="2"> 3</label>
+              </div>
+              <div class="paper-pages" id="paper-pages"></div>
+              <p class="empty" id="paper-status">Press Preview to lay out the pages.</p>
+            </div>
+            <div class="panel-foot">
+              <span class="muted small" id="paper-price"></span>
+              <span class="spacer"></span>
+              <button class="bp-btn" id="paper-preview">Preview</button>
+              <button class="bp-btn primary" id="paper-save">Save and print</button>
+            </div>
           </div>
         </div>
 
@@ -135,8 +162,10 @@
           <h2>Your gold:</h2>
           <div class="gold-balance"><i class="coin lg"></i><span id="gold-amount">0</span><span class="spacer"></span><button class="bp-btn primary" id="gold-daily">Claim daily bonus</button></div>
           <div class="list-box tall-ish">
-            <h3 class="box-title">Shop</h3>
+            <h3 class="box-title">Backgrounds</h3>
             <ul class="shop" id="shop"></ul>
+            <h3 class="box-title" id="premium-title">Features, moods &amp; pokes</h3>
+            <ul class="shop" id="premium"></ul>
             <h3 class="box-title">How to earn gold</h3>
             <ul class="earn" id="earn"></ul>
             <h3 class="box-title">Recent activity</h3>

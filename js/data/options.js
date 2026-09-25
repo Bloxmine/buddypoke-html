@@ -31,22 +31,44 @@ export const CUSTOMIZATION_OPTIONS = [
   ]
  },
  {
-  "name": "Hair Color",
+  "name": "Hair 2",
   "items": [
    {
     "type": "color",
     "path": "Hair;Material;Hair;Hair",
-    "id": "hrc"
+    "id": "hrc",
+    "copies": [
+     "HairAfro;Material;Hair;Hair",
+     "HairDread;Material;Hair;Hair"
+    ]
    },
    {
     "type": "texture",
     "path": "Hair;Material;HairPattern",
-    "id": "hpt"
+    "id": "hpt",
+    "copies": [
+     "HairAfro;Material;HairPattern",
+     "HairDread;Material;HairPattern"
+    ]
    },
    {
     "type": "color",
     "path": "Hair;Material;HairPatternColor;BlankClip",
-    "id": "hpc"
+    "id": "hpc",
+    "copies": [
+     "HairAfro;Material;HairPatternColor;BlankClip",
+     "HairDread;Material;HairPatternColor;BlankClip"
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Hair Strand",
+  "items": [
+   {
+    "type": "texture",
+    "path": "Hair;Material;Hardlight",
+    "id": "hps"
    }
   ]
  },
@@ -56,12 +78,20 @@ export const CUSTOMIZATION_OPTIONS = [
    {
     "type": "texture",
     "path": "Hair;Material;HairPattern2",
-    "id": "hpt2"
+    "id": "hpt2",
+    "copies": [
+     "HairAfro;Material;HairPattern2",
+     "HairDread;Material;HairPattern2"
+    ]
    },
    {
     "type": "color",
     "path": "Hair;Material;HairPattern2Color;BlankClip",
-    "id": "hpc2"
+    "id": "hpc2",
+    "copies": [
+     "HairAfro;Material;HairPattern2Color;BlankClip",
+     "HairDread;Material;HairPattern2Color;BlankClip"
+    ]
    }
   ]
  },
@@ -70,12 +100,12 @@ export const CUSTOMIZATION_OPTIONS = [
   "items": [
    {
     "type": "texture",
-    "path": "Hair_Shave;Material;Hair",
+    "path": "Head;Material;HairShave",
     "id": "hst"
    },
    {
     "type": "color",
-    "path": "Hair_Shave;Material;HairColor;BlankClip",
+    "path": "Head;Material;HairShaveColor;BlankClip",
     "id": "hsc"
    }
   ]
@@ -86,13 +116,24 @@ export const CUSTOMIZATION_OPTIONS = [
    {
     "type": "color",
     "path": "BCap;Material;BCap;BCap",
-    "id": "cpc"
+    "id": "cpc",
+    "copies": [
+     "WHat;Material;WHat;WHat_Solid"
+    ]
    },
    {
     "type": "color",
     "path": "BCap;Material;BCapHair;BCap_Hair",
-    "id": "chc"
-   },
+    "id": "chc",
+    "copies": [
+     "WHat;Material;Hair;WHat_Hair"
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Cap 2",
+  "items": [
    {
     "type": "texture",
     "path": "BCap;Material;BCapPattern1",
@@ -102,12 +143,7 @@ export const CUSTOMIZATION_OPTIONS = [
     "type": "color",
     "path": "BCap;Material;BCapPatternColor1;BlankClip",
     "id": "cp2"
-   }
-  ]
- },
- {
-  "name": "Cap 2",
-  "items": [
+   },
    {
     "type": "texture",
     "path": "BCap;Material;BCapPattern2",
@@ -292,6 +328,41 @@ export const CUSTOMIZATION_OPTIONS = [
     "type": "color",
     "path": "Body;Material;ShrtLayer2Color;BlankClip",
     "id": "sl2c"
+   }
+  ]
+ },
+ {
+  "name": "Jersey #",
+  "items": [
+   {
+    "type": "texture",
+    "path": "Body;Material;Shrt_Numb_X",
+    "id": "nm1"
+   }
+  ]
+ },
+ {
+  "name": "Jersey ##",
+  "items": [
+   {
+    "type": "texture",
+    "path": "Body;Material;Shrt_Numb_X0",
+    "id": "nm2"
+   },
+   {
+    "type": "texture",
+    "path": "Body;Material;Shrt_Numb_0X",
+    "id": "nm3"
+   }
+  ]
+ },
+ {
+  "name": "Jersey Line",
+  "items": [
+   {
+    "type": "color",
+    "path": "Body;Material;NumbLColor;BlankClip",
+    "id": "nm4"
    }
   ]
  },
@@ -537,6 +608,36 @@ export const CUSTOMIZATION_OPTIONS = [
     "type": "color",
     "path": "Body;Material;SockPatternColor;BlankClip",
     "id": "sopc"
+   }
+  ]
+ },
+ {
+  "name": "Neck Accessories",
+  "items": [
+   {
+    "type": "texture",
+    "path": "Body;Material;NeckAcc",
+    "id": "nckt"
+   },
+   {
+    "type": "color",
+    "path": "Body;Material;NeckAccColor;BlankClip",
+    "id": "nckc"
+   }
+  ]
+ },
+ {
+  "name": "Wrist Accessories",
+  "items": [
+   {
+    "type": "texture",
+    "path": "Body;Material;WristAcc",
+    "id": "wrst"
+   },
+   {
+    "type": "color",
+    "path": "Body;Material;WristAccColor;BlankClip",
+    "id": "wrsc"
    }
   ]
  },

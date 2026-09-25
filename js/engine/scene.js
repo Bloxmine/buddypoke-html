@@ -164,6 +164,7 @@ export class Camera extends BaseObj {
     this.view = new GLMatrix();
     this.cameraToWorld = new GLMatrix();
     this.isBound = false; this.lookAt = null;
+    this.ortho = false; // orthographic (paper buddies), July 2009 engine
   }
   update(ctx) {
     const view = this.view;
@@ -287,31 +288,46 @@ export class Mesh extends BaseObj {
       if (!any) return;
     }
     const M = this.M;
-    ctx.hproj.copyTo(M);
-    M.glMultMatrix(ctx.hview);
+    const ortho = ctx.camera && ctx.camera.ortho;
+    if (ortho) ctx.hview.copyTo(M);
+    else { ctx.hproj.copyTo(M); M.glMultMatrix(ctx.hview); }
     if (this.modifier == null || (this.modifier != null && this.modifier.hasSkin === false)) M.glMultMatrix(ctx.hworld);
     this.mverts = this.verts;
     if (this.modifier != null) this.modifier.modifyVerts(ctx, this);
-    const hw = ctx.width * 0.5, hh = ctx.height * 0.5, nh = -hh;
-    const a0 = M.m0 * hw, a1 = M.m1 * nh, a2 = M.m2;
-    const a4 = M.m4 * hw, a5 = M.m5 * nh, a6 = M.m6;
-    const a8 = M.m8 * hw, a9 = M.m9 * nh, a10 = M.m10;
-    const a12 = M.m12 * hw, a13 = M.m13 * nh, a14 = M.m14;
     const mverts = this.mverts, sv = this.screenVerts;
-    for (let i = 0; i < this.numVerts; i++) {
-      const v = mverts[i], s = sv[i];
-      const x = v.x, y = v.y, z = v.z;
-      s.z = a2 * x + a6 * y + a10 * z + a14;
-      s.x = (a0 * x + a4 * y + a8 * z + a12) / s.z + hw;
-      s.y = (a1 * x + a5 * y + a9 * z + a13) / s.z + hh;
+    if (ortho) {
+      // Orthographic projection in millimetres -> pixels at ORTHO_DPI.
+      const k = ctx.ORTHO_DPI / 25.4, ox = ctx.ORTHO_OFFSET_X * k, oy = ctx.ORTHO_OFFSET_Y * k;
+      for (let i = 0; i < this.numVerts; i++) {
+        const v = mverts[i], s = sv[i];
+        const x = v.x, y = v.y, z = v.z;
+        s.z = 0;
+        s.x = (M.m0 * x + M.m4 * y + M.m8 * z + M.m12) * k + ox;
+        s.y = -(M.m1 * x + M.m5 * y + M.m9 * z + M.m13) * k + oy;
+      }
+    } else {
+      const hw = ctx.width * 0.5, hh = ctx.height * 0.5, nh = -hh;
+      const a0 = M.m0 * hw, a1 = M.m1 * nh, a2 = M.m2;
+      const a4 = M.m4 * hw, a5 = M.m5 * nh, a6 = M.m6;
+      const a8 = M.m8 * hw, a9 = M.m9 * nh, a10 = M.m10;
+      const a12 = M.m12 * hw, a13 = M.m13 * nh, a14 = M.m14;
+      for (let i = 0; i < this.numVerts; i++) {
+        const v = mverts[i], s = sv[i];
+        const x = v.x, y = v.y, z = v.z;
+        s.z = a2 * x + a6 * y + a10 * z + a14;
+        s.x = (a0 * x + a4 * y + a8 * z + a12) / s.z + hw;
+        s.y = (a1 * x + a5 * y + a9 * z + a13) / s.z + hh;
+      }
     }
     let zoff = 0;
-    if (!isNaN(this.localZDepthOffset) && this.localZDepthOffset !== 0) {
-      ctx.hview.copyTo(M);
-      M.glMultMatrix(ctx.hworld);
-      zoff = M.m10 * this.localZDepthOffset;
+    if (!ortho) {
+      if (!isNaN(this.localZDepthOffset) && this.localZDepthOffset !== 0) {
+        ctx.hview.copyTo(M);
+        M.glMultMatrix(ctx.hworld);
+        zoff = M.m10 * this.localZDepthOffset;
+      }
+      if (!isNaN(this.screenZDepthOffset)) zoff += this.screenZDepthOffset;
     }
-    if (!isNaN(this.screenZDepthOffset)) zoff += this.screenZDepthOffset;
     const list = ctx.visibleTriList;
     let count = ctx.visibleTriCount;
     const tris = this.triangles, cull = this.cull;

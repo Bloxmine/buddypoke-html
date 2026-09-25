@@ -243,6 +243,15 @@ export class Social {
     return true;
   }
 
+  // Premium moods/pokes (unlocked by id, price paid in gold).
+  unlock(id, price, name) {
+    if (this.owns(id) || this.data.gold < price) return false;
+    this.data.owned.push(id);
+    this.addGold(-price, 'Unlocked ' + name);
+    this.emit('owned');
+    return true;
+  }
+
   giftGold(friendId, amount) {
     const f = this.friend(friendId);
     if (!f || amount <= 0 || this.data.gold < amount) return false;

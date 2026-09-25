@@ -6,6 +6,9 @@ import { Player, catalogItems, catalogMaterialOptions } from './engine/player.js
 import { Vector3, AxisAngle } from './engine/math.js';
 import { parseXML, xmlAttr, xmlChildren } from './xml.js';
 import { CUSTOMIZATION_OPTIONS } from './data/options.js';
+import { DEFAULT_BUDDY } from './data/defaults.js';
+
+export { DEFAULT_BUDDY };
 
 Object.assign(AMF3Reader.classes, CLASS_ALIASES);
 
@@ -192,6 +195,16 @@ export class Buddy extends SceneObject {
   }
 
   deserialize(ser) {
+    const setColor = (path, val) => {
+      const t = this.findTexture(path);
+      if (t && t.parentNode) { t.parentNode.setAttribute('colorIndex', val); t.setAttribute('colorSelection', val); }
+    };
+    const setTexture = (path, val) => { const l = this.findLayer(path); if (l) l.setAttribute('textureIndex', val); };
+    const setGroup = (path, val) => {
+      const [cat, grp] = path.split(';');
+      const idx = parseInt(val, 10) | 0;
+      this.findGroupItems(cat, grp).forEach((it, i) => it.setAttribute('visible', i === idx ? 'true' : 'false'));
+    };
     for (const op of CUSTOMIZATION_OPTIONS) {
       for (const sub of op.items) {
         const v = ser[sub.id];
@@ -199,31 +212,35 @@ export class Buddy extends SceneObject {
         const val = String(v);
         if (sub.type === 'color') {
           const tex = this.findTexture(sub.path);
-          if (tex) {
-            const color = xmlAttr(tex, 'color');
-            if (color != null && color.length > 0) {
-              tex.parentNode.setAttribute('colorIndex', val);
-              tex.setAttribute('colorSelection', val);
-            }
-          }
-          for (const copy of sub.copies || []) {
-            const t1 = this.findTexture(copy);
-            if (t1) { t1.parentNode.setAttribute('colorIndex', val); t1.setAttribute('colorSelection', val); }
-          }
+          const color = tex && xmlAttr(tex, 'color');
+          if (color != null && color.length > 0) setColor(sub.path, val);
+          for (const copy of sub.copies || []) setColor(copy, val);
         } else if (sub.type === 'texture') {
-          const layer = this.findLayer(sub.path);
-          if (layer) layer.setAttribute('textureIndex', val);
+          setTexture(sub.path, val);
+          for (const copy of sub.copies || []) setTexture(copy, val);
         } else if (sub.type === 'item') {
           const [cat, name] = sub.path.split(';');
           const item = this.findItem(cat, name);
           if (item) item.setAttribute('visible', val === '1' ? 'true' : 'false');
         } else if (sub.type === 'itemGroup') {
-          const [cat, grp] = sub.path.split(';');
-          const items = this.findGroupItems(cat, grp);
-          const idx = parseInt(val, 10) | 0;
-          items.forEach((it, i) => it.setAttribute('visible', i === idx ? 'true' : 'false'));
+          setGroup(sub.path, val);
+          for (const copy of sub.copies || []) setGroup(copy, val);
         }
       }
+    }
+    // Buddy.deserialize layerDependencies: clear layers that do not apply
+    // to the chosen shoe, belt, hair or shirt.
+    for (const op of CUSTOMIZATION_OPTIONS) for (const sub of op.items) {
+      const v = ser[sub.id];
+      if (v != null && LAYER_DEPENDENCIES[sub.id]) this.resetLayers(LAYER_DEPENDENCIES[sub.id](parseInt(v, 10) | 0));
+    }
+  }
+
+  resetLayers(ids) {
+    for (const op of CUSTOMIZATION_OPTIONS) for (const sub of op.items) {
+      if (sub.type !== 'texture' || !ids.includes(sub.id)) continue;
+      const layer = this.findLayer(sub.path);
+      if (layer) layer.setAttribute('textureIndex', '0');
     }
   }
 
@@ -269,6 +286,15 @@ export class Buddy extends SceneObject {
   async serializeCompressed() { return encodeBuddyString(this.serialize()); }
   resetToDefault() { return this.deserializeCompressed(DEFAULT_BUDDY); }
 }
+
+// Which texture options to reset for a given selection (Buddy.as
+// layerDependencies, July 2009 version).
+export const LAYER_DEPENDENCIES = {
+  sst: (v) => [...(v < 1 || v > 3 ? ['sd1'] : []), ...(v !== 4 ? ['sd3', 'sh1'] : []), ...(v !== 5 ? ['sd5', 'sh3'] : [])],
+  blt: (v) => [...(v < 1 || v > 3 ? ['hbp'] : []), ...(v < 4 || v > 6 ? ['lbp'] : [])],
+  hrt: (v) => (v !== 31 ? ['hst'] : []),
+  sl2t: (v) => [...(v !== 34 ? ['nm2', 'nm3'] : []), ...(v !== 33 ? ['nm1'] : [])],
+};
 
 export class SceneSetting extends SceneObject {
   constructor() {
@@ -375,6 +401,3 @@ export async function encodeBuddyString(json) {
   const z = new Uint8Array(await new Response(new Blob([amf]).stream().pipeThrough(cs)).arrayBuffer());
   return base64Encode(z);
 }
-
-// buddypoke.core.Defaults.Buddy
-export const DEFAULT_BUDDY = 'eNo1UstuhDAMvPVDOPfQBNh2_RwCIitAWBittFr1B/rVtTOT0zjj9zgff493k6fUDPGzGYn5vJohBDeMaHsz5IJHjOi6QsRm_CqMGdEttRh3aSqe5LGWm7JhKESwao6R2JrDI6QrGXMARHSf29Jzfl2gXz6dE0rCG1kdlaO8Vc6SsMO9M2wfKyK8T3gvW0Xw_8q41fvcrV7G0pqxkG7BiHsxPMRbb9Gon2JgW/GqN0eGiEv37Zigk1TppEjnhdcHETVUqL9K3ZApWlNGDj9y_DwKzjFi1o3vjW/lcbRqpqa1d9AInKC9ThEjTC3ipg6ia2ZC5iRTT7xRpBbvjFvqcRH5hfQQjnD4Vr7esj3rCZ4YazkDMfIWgbfBmPvqfyL_/gN6P7IG';

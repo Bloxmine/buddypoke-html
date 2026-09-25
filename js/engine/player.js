@@ -19,6 +19,10 @@ export class Context {
     this.visibleTriList = [];
     this.visibleTriCount = 0;
     this.cameras = null;
+    // Orthographic rendering (July 2009 engine, used for paper buddies).
+    this.ORTHO_DPI = 72;
+    this.ORTHO_OFFSET_X = 0;
+    this.ORTHO_OFFSET_Y = 0;
   }
 
   init(w, h) { this.width = w; this.height = h === 0 ? 1 : h; }

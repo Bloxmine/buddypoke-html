@@ -32,22 +32,25 @@ export class BuddyPokeRenderer {
 
   async load(progress = () => {}) {
     progress('Loading content…', 0.05);
-    const [pkgBytes, v1Bytes, libJson] = await Promise.all([
+    const [pkgBytes, v1Bytes, extraBytes, libJson, iconBytes] = await Promise.all([
       fetchBytes('assets/chick.bin'),
       fetchBytes('assets/anims_v1.bin').catch(() => null),
+      fetchBytes('assets/anims_extra.bin').catch(() => null),
       fetch('assets/library.json').then((r) => r.json()),
+      fetchBytes('assets/icons.swf').catch(() => null),
     ]);
     progress('Unpacking model…', 0.25);
     const pkg = await parsePackage(pkgBytes);
     progress('Loading textures…', 0.45);
     this.matLib = new MediaLibrary();
-    await this.matLib.init(pkg.m, libJson);
+    await this.matLib.init(pkg.m, libJson, iconBytes);
     progress('Loading animations…', 0.65);
     const animSources = [{ name: 'embedded', bytes: pkg.a, override: true }];
-    if (v1Bytes) {
-      const { inflate } = await import('./bytearray.js');
-      animSources.push({ name: 'v1', bytes: await inflate(v1Bytes) });
-    }
+    const { inflate } = await import('./bytearray.js');
+    // Standalone animations recovered from the MySpace CDN (newer format).
+    if (extraBytes) animSources.push({ name: 'extra', bytes: await inflate(extraBytes) });
+    // BuddyPoke 1.0 animation library (older format, see Anim.decode).
+    if (v1Bytes) animSources.push({ name: 'v1', bytes: await inflate(v1Bytes) });
     this.pkg = pkg;
     this.animSources = animSources;
 
