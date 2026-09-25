@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BuddyPoke</title>
+  <meta name="description" content="The BuddyPoke 3D avatar, ported from Flash to HTML, CSS and JavaScript.">
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="bp">
+    <nav class="bp-tabs" role="tablist" aria-label="BuddyPoke">
+      <button role="tab" data-tab="home"><i class="ico" data-icon="16"></i>BuddyPoke<span class="badge" id="unread" hidden></span></button>
+      <button role="tab" data-tab="friends"><i class="ico" data-icon="49"></i>Friends</button>
+      <button role="tab" data-tab="mood" aria-selected="true"><i class="ico" data-icon="74"></i>Mood</button>
+      <button role="tab" data-tab="appearance"><i class="ico" data-icon="71"></i>Appearance</button>
+      <button role="tab" data-tab="create"><i class="ico" data-icon="65"></i>Create</button>
+      <button role="tab" data-tab="gold"><i class="coin" aria-hidden="true"></i>Gold</button>
+      <button role="tab" data-tab="pictures"><i class="ico" data-icon="64"></i>Pictures</button>
+      <button role="tab" data-tab="help" class="help" aria-label="Help and settings"><span class="qmark">?</span></button>
+    </nav>
+
+    <div class="bp-body">
+      <section class="bp-stage-col">
+        <div class="stage" id="stage">
+          <canvas id="buddy-canvas" aria-label="Your buddy"></canvas>
+          <div class="stage-loading" id="loading">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="loading-text">Loading…</p>
+            <div class="progress"><span id="loading-bar"></span></div>
+          </div>
+          <div class="stage-hint" id="stage-hint" hidden>Drag to turn your buddy</div>
+        </div>
+        <p class="status-line" id="status-line">&nbsp;</p>
+      </section>
+
+      <aside class="bp-panel-col">
+        <!-- BuddyPoke (home): profile and event history -->
+        <div class="panel" data-panel="home" hidden>
+          <div class="profile">
+            <img class="face" id="my-face" alt="">
+            <div class="profile-info">
+              <b id="my-name">Buddy</b>
+              <span id="my-mood" class="muted"></span>
+              <span class="stats"><span id="stat-sent">0</span> pokes sent · <span id="stat-rec">0</span> received · <i class="coin sm"></i><span id="stat-gold">0</span></span>
+            </div>
+          </div>
+          <div class="sub-tabs" id="history-filter">
+            <button data-filter="all" aria-selected="true">All</button>
+            <button data-filter="received">Received</button>
+            <button data-filter="sent">Sent</button>
+            <button data-filter="moods">Moods</button>
+          </div>
+          <div class="list-box tall-ish">
+            <ul class="history" id="history"></ul>
+            <p class="empty" id="history-empty">Nothing here yet.</p>
+          </div>
+          <div class="panel-foot"><span class="muted small">Newest first</span><span class="spacer"></span><button class="bp-btn" id="history-clear">Clear history</button></div>
+        </div>
+
+        <!-- Friends: friend list and pokes -->
+        <div class="panel" data-panel="friends" hidden>
+          <h2>Your friends:</h2>
+          <div class="friend-strip" id="friend-strip"></div>
+          <div class="friend-card" id="friend-card">
+            <img class="face" id="friend-face" alt="">
+            <div class="friend-info">
+              <b id="friend-name-label">Friend</b>
+              <span id="friend-mood" class="muted"></span>
+            </div>
+            <div class="friend-actions">
+              <button class="bp-btn" id="friend-view">View mood</button>
+              <button class="bp-btn" id="friend-edit">Customize</button>
+              <button class="bp-btn" id="friend-more" aria-label="More">…</button>
+            </div>
+          </div>
+          <h2 class="tight">Poke <span id="poke-target">your friend</span>:</h2>
+          <div class="cat-tabs" id="poke-cats"></div>
+          <div class="list-box short"><ul class="action-list" id="poke-list"></ul></div>
+          <label class="comment">Add a comment: <span>(optional)</span>
+            <input type="text" id="poke-comment" maxlength="100" autocomplete="off">
+            <small class="count" data-for="poke-comment">0/100</small>
+          </label>
+          <div class="panel-foot">
+            <label class="check"><input type="checkbox" id="poke-private"> Private</label>
+            <span class="spacer"></span>
+            <button class="bp-btn primary" id="poke-send">Poke!</button>
+          </div>
+        </div>
+
+        <!-- Mood -->
+        <div class="panel" data-panel="mood">
+          <h2>Change your mood:</h2>
+          <div class="cat-tabs" id="mood-cats"></div>
+          <div class="list-box"><ul class="action-list" id="mood-list"></ul></div>
+          <label class="comment">Add a comment: <span>(optional)</span>
+            <input type="text" id="mood-comment" maxlength="100" autocomplete="off">
+            <small class="count" data-for="mood-comment">0/100</small>
+          </label>
+          <div class="panel-foot"><span class="muted small" id="mood-hint">Pick a mood to preview it.</span><span class="spacer"></span><button class="bp-btn primary" id="mood-save">Save mood</button></div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="panel" data-panel="appearance" hidden>
+          <h2>Customize your appearance:</h2>
+          <div class="who-tabs" role="radiogroup" aria-label="Whose buddy">
+            <button role="radio" aria-checked="true" data-target="me">My buddy</button>
+            <button role="radio" aria-checked="false" data-target="friend">My friend</button>
+          </div>
+          <div class="list-box tall"><div class="options" id="options"></div></div>
+          <div class="panel-foot">
+            <button class="bp-btn" id="app-random">Randomize</button>
+            <button class="bp-btn" id="app-reset">Reset</button>
+            <span class="spacer"></span>
+            <button class="bp-btn primary" id="app-done">Done</button>
+          </div>
+        </div>
+
+        <!-- Create: comic strips -->
+        <div class="panel" data-panel="create" hidden>
+          <h2>Create a comic strip:</h2>
+          <canvas class="comic-preview" id="comic-preview" width="1038" height="380"></canvas>
+          <div class="list-box comic-box" id="comic-panels"></div>
+          <div class="panel-foot">
+            <label class="check"><input type="checkbox" id="comic-friend" checked> Friend in pokes</label>
+            <span class="spacer"></span>
+            <button class="bp-btn" id="comic-render">Update preview</button>
+            <button class="bp-btn primary" id="comic-save">Save to Pictures</button>
+          </div>
+        </div>
+
+        <!-- Gold -->
+        <div class="panel" data-panel="gold" hidden>
+          <h2>Your gold:</h2>
+          <div class="gold-balance"><i class="coin lg"></i><span id="gold-amount">0</span><span class="spacer"></span><button class="bp-btn primary" id="gold-daily">Claim daily bonus</button></div>
+          <div class="list-box tall-ish">
+            <h3 class="box-title">Shop</h3>
+            <ul class="shop" id="shop"></ul>
+            <h3 class="box-title">How to earn gold</h3>
+            <ul class="earn" id="earn"></ul>
+            <h3 class="box-title">Recent activity</h3>
+            <ul class="ledger" id="ledger"></ul>
+          </div>
+        </div>
+
+        <!-- Pictures -->
+        <div class="panel" data-panel="pictures" hidden>
+          <h2>Pictures:</h2>
+          <div class="list-box tall">
+            <div class="gallery" id="gallery"></div>
+            <p class="empty" id="gallery-empty">Take a picture of your buddy with the button below.</p>
+          </div>
+          <div class="panel-foot"><button class="bp-btn primary" id="snapshot">Take picture</button></div>
+        </div>
+
+        <!-- ? : help and settings -->
+        <div class="panel" data-panel="help" hidden>
+          <h2>Help &amp; settings:</h2>
+          <div class="list-box tall">
+            <form class="settings" id="settings" onsubmit="return false">
+              <fieldset>
+                <legend>Names</legend>
+                <label>Your name <input type="text" id="set-name" maxlength="24" autocomplete="off"></label>
+                <label>Friend’s name <input type="text" id="set-friend-name" maxlength="24" autocomplete="off"></label>
+              </fieldset>
+              <fieldset>
+                <legend>Display</legend>
+                <label>Frame rate
+                  <select id="set-fps">
+                    <option value="0">Smooth (screen refresh rate)</option>
+                    <option value="14">Classic (14 fps, like the Flash version)</option>
+                  </select>
+                </label>
+                <label>Texture detail
+                  <select id="set-texscale">
+                    <option value="1">Original (Flash resolution)</option>
+                    <option value="2">Sharp (2×)</option>
+                  </select>
+                </label>
+                <label>Background
+                  <select id="set-bg">
+                    <option value="white">White</option>
+                    <option value="transparent">Transparent</option>
+                  </select>
+                </label>
+              </fieldset>
+              <fieldset>
+                <legend>Appearance code</legend>
+                <p>Same compressed format as the original BuddyPoke, so old codes work here.</p>
+                <textarea id="set-code" rows="4" spellcheck="false"></textarea>
+                <div class="row">
+                  <button class="bp-btn" id="code-copy">Copy</button>
+                  <button class="bp-btn" id="code-apply">Apply to me</button>
+                  <button class="bp-btn" id="code-apply-friend">Apply to friend</button>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>About</legend>
+                <p>Moods and pokes with a lock used animations that were streamed from MySpace servers which no longer exist.</p>
+                <p>Friends, pokes you receive and gold are simulated in your browser; nothing is sent anywhere.</p>
+                <button class="bp-btn danger" id="reset-all">Reset everything</button>
+              </fieldset>
+            </form>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="popover" id="popover" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
