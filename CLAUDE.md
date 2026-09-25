@@ -33,6 +33,7 @@ HTML5 port of the BuddyPoke Flash app: plain ES modules, no build step, no runti
 - 1.0 animations (`anim.lib.targets` set) have no `IG_Root` track and address the face material on `Head`; see `V1_STAGE_PLACEMENT` in `scene.js` and the remap in `Anim.decode`.
 - `Anim` objects cache node references, so each buddy decodes its own copies. Never share an `Anim` between buddies.
 - Appearance codes must stay compatible with the original BuddyPoke format (unknown ids are ignored by the original reader). Options can `copy` their value to other paths (colour, texture and itemGroup copies) and some selections reset other layers (`LAYER_DEPENDENCIES` in `buddy.js`); keep `Buddy.deserialize` and `CustomizePanel.apply` in sync.
+- Performance on phones is dominated by texture building, not 3D rendering (a frame is ~0.5 ms). Keep `getImageData`/`putImageData` off hot paths: layer tints and masks run on the GPU (`js/gputint.js`, CPU fallback in `medialib.js`), SWF colour transforms in `display.js` go through the same tinter, and palettes read the decoded `imageData`. Friend portraits are rendered lazily in idle time and only when visible (`setFace`/`pumpFaces` in `app.js`); the renderer pauses offscreen and caps the device pixel ratio at 2.
 - Premium moods/pokes carry `cost`/`pid` (coins); prices are shown ×10 in gold (`GOLD_PER_COIN` in `app.js`) and unlocked ids are stored in `social.data.owned`.
 
 ## Regenerating assets

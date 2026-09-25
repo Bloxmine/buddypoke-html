@@ -5,6 +5,7 @@
 import { SWF, makeCanvas } from './swf/swf.js';
 import { MovieClip, createInstance, renderDisplayObject, applyColorMatrix, blendToComposite, IDENTITY_CX } from './swf/display.js';
 import { xmlAttr, xmlChildren, xmlHas } from './xml.js';
+import { GpuTinter } from './gputint.js';
 
 const MAT_50_PERCENT = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0.5, 0];
 const IDENTITY_M = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
@@ -60,10 +61,11 @@ export class MediaLibrary {
     if (this.paletteCache.has(name)) return this.paletteCache.get(name);
     const ch = this.swf.getCharacterByName(name);
     if (!ch || ch.kind !== 'bitmap') return null;
-    const ctx = ch.canvas.getContext('2d');
-    const d = ctx.getImageData(0, 0, ch.width, ch.height).data;
-    const out = [];
-    for (let i = 0; i < d.length; i += 4) out.push(((d[i + 3] << 24) | (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) >>> 0);
+    // Lossless bitmaps keep their decoded pixels; reading those avoids a
+    // GPU readback of the canvas (about a second on slow phones).
+    const d = (ch.imageData || ch.canvas.getContext('2d').getImageData(0, 0, ch.width, ch.height)).data;
+    const out = new Uint32Array(d.length >> 2);
+    for (let i = 0, j = 0; i < d.length; i += 4, j++) out[j] = ((d[i + 3] << 24) | (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) >>> 0;
     this.paletteCache.set(name, out);
     return out;
   }
@@ -92,17 +94,22 @@ export class MediaLibrary {
       const b = this.bounds(sym, IDENTITY_M);
       if (b && b.xmax > b.xmin && b.ymax > b.ymin) {
         c = this.rasterize(sym, rect.width, rect.height, s);
-        const ctx = c.getContext('2d', { willReadFrequently: true });
-        if (colorMatrix) {
-          const d = ctx.getImageData(0, 0, c.width, c.height);
-          applyColorMatrix(d.data, colorMatrix);
-          ctx.putImageData(d, 0, 0);
-        }
-        if (maskKey) {
-          const m = this.maskCanvas(maskKey, rect, s);
-          ctx.globalCompositeOperation = 'destination-in';
-          if (m) ctx.drawImage(m, 0, 0); else ctx.clearRect(0, 0, c.width, c.height);
-          ctx.globalCompositeOperation = 'source-over';
+        const m = maskKey ? this.maskCanvas(maskKey, rect, s) : null;
+        if (this.tinter === undefined) this.tinter = GpuTinter.create();
+        if ((colorMatrix || m) && this.tinter && this.tinter.apply(c, colorMatrix, m)) {
+          // tinted and masked on the GPU
+        } else {
+          const ctx = c.getContext('2d');
+          if (colorMatrix) {
+            const d = ctx.getImageData(0, 0, c.width, c.height);
+            applyColorMatrix(d.data, colorMatrix);
+            ctx.putImageData(d, 0, 0);
+          }
+          if (maskKey) {
+            ctx.globalCompositeOperation = 'destination-in';
+            if (m) ctx.drawImage(m, 0, 0); else ctx.clearRect(0, 0, c.width, c.height);
+            ctx.globalCompositeOperation = 'source-over';
+          }
         }
       }
     }

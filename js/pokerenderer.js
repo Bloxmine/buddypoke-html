@@ -270,8 +270,14 @@ export class BuddyPokeRenderer {
   }
 
   start() {
+    // Don't render while the stage is scrolled out of view.
+    this.onScreen = true;
+    if (typeof IntersectionObserver !== 'undefined') {
+      new IntersectionObserver((e) => { this.onScreen = e[0].isIntersecting; }).observe(this.canvas);
+    }
     const loop = (t) => {
       requestAnimationFrame(loop);
+      if (!this.onScreen) return;
       if (this.fps > 0) {
         const interval = 1000 / this.fps;
         if (t - this.lastTick < interval - 1) return;

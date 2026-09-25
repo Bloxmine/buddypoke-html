@@ -107,7 +107,9 @@ export class GLRenderer {
     this.background = [1, 1, 1, 1];
   }
 
-  resize(cssW, cssH, dpr = window.devicePixelRatio || 1) {
+  // Device pixel ratio is capped at 2: phones report 3+, which triples the
+  // fill work for no visible gain at this panel size.
+  resize(cssW, cssH, dpr = Math.min(2, window.devicePixelRatio || 1)) {
     const w = Math.round(cssW * dpr), h = Math.round(cssH * dpr);
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
   }

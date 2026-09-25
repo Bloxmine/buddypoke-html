@@ -7,6 +7,7 @@ import { MOODS, POKES } from './data/moods.js';
 import { setTextureScale } from './medialib.js';
 import { CustomizePanel } from './ui/customize.js';
 import { iconStyle, popover, toast } from './ui/widgets.js';
+const pop = document.getElementById('popover');
 import { Social, SHOP, GOLD_RULES } from './social.js';
 import { PaperBuddies, pagesToPDF } from './paper.js';
 
@@ -92,7 +93,7 @@ async function showView(v) {
   view = v;
   if (renderer.mode === 'customize') leaveCustomizeStage();
   if (v.kind === 'mood') {
-    await standardCast();
+    await setCast(myCode(), cast.b2); // the friend's buddy is only needed for pokes
     renderer.showMood(v.id);
     setStatus(fill(moodDef(v.id).desc, nameB(settings.name)), v.comment);
   } else if (v.kind === 'poke') {
@@ -132,6 +133,7 @@ function showTab(name) {
   for (const b of $$('.bp-tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
   for (const p of $$('.panel')) p.hidden = p.dataset.panel !== name;
   popover.close();
+  requestAnimationFrame(wakeFaces);
   if (name === 'appearance') { enterCustomize(); return; }
   if (renderer.mode === 'customize') leaveCustomizeStage();
   if (name === 'home') { social.markRead(); renderProfile(); }
@@ -266,24 +268,43 @@ function initLists() {
 }
 
 // ------------------------------------------------------------ faces
+// Portraits need a fully dressed buddy (all textures built), which is the
+// most expensive thing the app does. Render them one at a time, in idle
+// time, only for images that are actually on screen, and cache the result.
 const faceCache = new Map(Object.entries(store.get('faces', {})));
-let faceQueue = Promise.resolve();
-function face(code) {
-  if (!code) return Promise.resolve('');
-  if (faceCache.has(code)) return Promise.resolve(faceCache.get(code));
-  faceQueue = faceQueue.then(async () => {
-    if (faceCache.has(code)) return faceCache.get(code);
-    await renderer.portraitBuddy.deserializeCompressed(code);
-    const c = renderer.portrait(renderer.portraitBuddy, 64, 64);
-    const url = c ? c.toDataURL('image/png') : '';
-    faceCache.set(code, url);
-    const obj = Object.fromEntries([...faceCache.entries()].slice(-24));
-    store.set('faces', obj);
-    return url;
-  });
-  return faceQueue;
+const faceWaiting = new Map(); // img -> code
+let facePumping = false;
+const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 60));
+
+function setFace(img, code) {
+  if (!img || !code) return;
+  if (faceCache.has(code)) { img.src = faceCache.get(code); return; }
+  faceWaiting.set(img, code);
+  if (!facePumping) { facePumping = true; idle(pumpFaces); }
 }
-const setFace = (img, code) => face(code).then((u) => { if (u) img.src = u; });
+
+async function pumpFaces() {
+  // Pick an image that is visible; drop images that left the page.
+  let job = null;
+  for (const [img, code] of faceWaiting) {
+    if (!img.isConnected) { faceWaiting.delete(img); continue; }
+    if (faceCache.has(code)) { img.src = faceCache.get(code); faceWaiting.delete(img); continue; }
+    if (img.offsetParent !== null) { job = [img, code]; break; }
+  }
+  if (!job) { facePumping = false; return; } // the rest waits until shown
+  const [img, code] = job;
+  faceWaiting.delete(img);
+  await renderer.portraitBuddy.deserializeCompressed(code);
+  const c = renderer.portrait(renderer.portraitBuddy, 64, 64);
+  const url = c ? c.toDataURL('image/png') : '';
+  faceCache.set(code, url);
+  store.set('faces', Object.fromEntries([...faceCache.entries()].slice(-120)));
+  if (url) img.src = url;
+  idle(pumpFaces);
+}
+
+// Re-queue portraits that were hidden when they were first requested.
+function wakeFaces() { if (faceWaiting.size && !facePumping) { facePumping = true; idle(pumpFaces); } }
 
 // ------------------------------------------------------------ friends tab
 function renderFriends() {
@@ -490,7 +511,7 @@ const targetBuddy = () => (appearanceTarget === 'friend' ? renderer.buddy2 : ren
 async function enterCustomize() {
   if (!customizePanel) return;
   if (appearanceTarget === 'friend' && !friend()) appearanceTarget = 'me';
-  await standardCast();
+  if (appearanceTarget === 'friend') await standardCast(); else await setCast(myCode(), cast.b2);
   renderer.customize(targetBuddy());
   customizePanel.setBuddy(targetBuddy());
   stage.classList.add('examine');
@@ -547,8 +568,9 @@ $('#app-presets').addEventListener('click', async (e) => {
   }
   wrap.appendChild(grid);
   popover.open(anchor, wrap);
-  // Portraits render one at a time in the background.
+  // Portraits render one at a time in idle time, as they scroll into view.
   [...grid.children].forEach((b, i) => setFace(b.querySelector('img'), presets[i].code));
+  pop.addEventListener('scroll', wakeFaces, { passive: true });
 });
 
 $('#app-random').addEventListener('click', async () => {
@@ -704,7 +726,8 @@ async function renderComic() {
   ctx.fillRect(0, 0, W, H);
   const withFriend = $('#comic-friend').checked;
   const saved = view;
-  await standardCast();
+  if (withFriend && comic.some((p) => p.action.startsWith('poke:'))) await standardCast();
+  else await setCast(myCode(), cast.b2);
   for (let i = 0; i < comic.length; i++) {
     const p = comic[i];
     const [type, id] = p.action.split(':');
@@ -967,7 +990,7 @@ async function boot() {
     await social.init();
     social.on(onSocial);
     window.bpSocial = social; // for debugging
-    await standardCast();
+    await setCast(myCode(), undefined); // the friend is dressed on first poke
     $('#loading').hidden = true;
     renderer.start();
     customizePanel = new CustomizePanel($('#options'), renderer, {

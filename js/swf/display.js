@@ -3,6 +3,7 @@
 // matrices, colour transforms and the blend modes used by the library.
 
 import { makeCanvas } from './swf.js';
+import { GpuTinter } from '../gputint.js';
 
 const IDENTITY_CX = [1, 1, 1, 1, 0, 0, 0, 0];
 const BLEND_NAMES = ['normal', 'normal', 'layer', 'multiply', 'screen', 'lighten', 'darken', 'difference', 'add', 'subtract', 'invert', 'alpha', 'erase', 'overlay', 'hardlight'];
@@ -187,22 +188,31 @@ function getPaths(def) {
   return paths;
 }
 
+// Bitmaps under a colour transform. Alpha-only transforms (the common
+// case) are drawn with globalAlpha; anything else is tinted once on the GPU
+// (CPU fallback) and cached. Returns [image, alpha].
 const bitmapCxCache = new WeakMap();
+let cxTinter;
 function bitmapWithCx(bmp, cx) {
-  if (isIdentityCx(cx)) return bmp.canvas;
+  if (isIdentityCx(cx)) return [bmp.canvas, 1];
+  if (cx[0] === 1 && cx[1] === 1 && cx[2] === 1 && !cx[4] && !cx[5] && !cx[6] && !cx[7]) return [bmp.canvas, Math.max(0, Math.min(1, cx[3]))];
   let m = bitmapCxCache.get(bmp);
   if (!m) bitmapCxCache.set(bmp, m = new Map());
-  const k = cx.join(',');
+  const k = cx.map((v) => Math.round(v * 1000)).join(',');
   let c = m.get(k);
-  if (c) return c;
+  if (c) return [c, 1];
   c = makeCanvas(bmp.width, bmp.height);
   const ctx = c.getContext('2d');
   ctx.drawImage(bmp.canvas, 0, 0);
-  const d = ctx.getImageData(0, 0, bmp.width, bmp.height);
-  applyCxToImageData(d.data, cx);
-  ctx.putImageData(d, 0, 0);
+  if (cxTinter === undefined) cxTinter = GpuTinter.create();
+  const matrix = [cx[0], 0, 0, 0, cx[4], 0, cx[1], 0, 0, cx[5], 0, 0, cx[2], 0, cx[6], 0, 0, 0, cx[3], cx[7]];
+  if (!(cxTinter && cxTinter.apply(c, matrix, null))) {
+    const d = ctx.getImageData(0, 0, bmp.width, bmp.height);
+    applyCxToImageData(d.data, cx);
+    ctx.putImageData(d, 0, 0);
+  }
   m.set(k, c);
-  return c;
+  return [c, 1];
 }
 
 export function applyCxToImageData(p, cx) {
@@ -270,12 +280,15 @@ function drawShape(ctx, def, m, cx) {
       } else if (s.bitmapId !== undefined) {
         const bitmap = currentSwf.characters.get(s.bitmapId);
         if (!bitmap || bitmap.kind !== 'bitmap') continue;
-        const pat = ctx.createPattern(bitmapWithCx(bitmap, cx), s.repeat ? 'repeat' : 'no-repeat');
+        const [img, alpha] = bitmapWithCx(bitmap, cx);
+        const pat = ctx.createPattern(img, s.repeat ? 'repeat' : 'no-repeat');
         const bm = s.matrix;
         pat.setTransform(new DOMMatrix([bm.a / 20, bm.b / 20, bm.c / 20, bm.d / 20, bm.tx / 20, bm.ty / 20]));
         ctx.imageSmoothingEnabled = s.smooth;
         ctx.fillStyle = pat;
+        ctx.globalAlpha = alpha;
         ctx.fill(f.path, rule);
+        ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = true;
       }
     }
@@ -334,7 +347,10 @@ function renderContent(ctx, obj, m, cx) {
   else if (obj instanceof BitmapInstance) {
     setTransform(ctx, m);
     ctx.imageSmoothingEnabled = obj.smoothing;
-    ctx.drawImage(bitmapWithCx(obj.bitmap, cx), 0, 0);
+    const [img, alpha] = bitmapWithCx(obj.bitmap, cx);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, 0, 0);
+    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
   } else if (obj instanceof Container) {
     const kids = obj.children;
