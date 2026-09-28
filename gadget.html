@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BuddyPoke</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* Embedded gadget: just the stage, filling the frame. */
+    body { background: transparent; }
+    .stage { max-width: none; }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <canvas id="buddy-canvas" aria-label="BuddyPoke"></canvas>
+    <div class="stage-loading" id="loading"><div class="spinner"></div><p id="loading-text">Loading…</p></div>
+  </div>
+  <script type="module" src="js/gadget.js"></script>
+</body>
+</html>

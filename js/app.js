@@ -1,6 +1,10 @@
 // BuddyPoke HTML5 front end: wires the renderer to the page UI. The social
 // side (friends, pokes you receive, gold) is simulated in the browser; see
 // social.js. State is kept in localStorage; there is no server.
+//
+// Host mode (index.html?host=kuddes): embedded in a social network, the
+// member's buddy, friends, pokes and gold come from the host instead; see
+// hostsocial.js. Everything else works the same.
 
 import { BuddyPokeRenderer } from './pokerenderer.js';
 import { MOODS, POKES } from './data/moods.js';
@@ -9,6 +13,7 @@ import { CustomizePanel } from './ui/customize.js';
 import { iconStyle, popover, toast } from './ui/widgets.js';
 const pop = document.getElementById('popover');
 import { Social, SHOP, GOLD_RULES } from './social.js';
+import { HostSocial, fetchHostData, saveHostBuddy } from './hostsocial.js';
 import { PaperBuddies, pagesToPDF } from './paper.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -20,6 +25,16 @@ const store = {
   set(k, v) { try { localStorage.setItem('bp.' + k, JSON.stringify(v)); return true; } catch { return false; } },
   clear() { try { Object.keys(localStorage).filter((k) => k.startsWith('bp.')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ } },
 };
+
+const params = new URLSearchParams(location.search);
+const HOST = params.get('host') === 'kuddes';
+// The member (host mode): {username, name, code, mood, comment}, set in boot().
+let hostMe = null;
+
+// Tells the host page about changes, e.g. so the profile shows the new buddy.
+function notifyHost(type, extra = {}) {
+  if (HOST && window.parent !== window) window.parent.postMessage({ source: 'buddypoke', type, ...extra }, location.origin);
+}
 
 const settings = Object.assign({ name: 'Buddy', fps: 0, texScale: 2, bg: 'white' }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
@@ -73,7 +88,7 @@ let view = null;            // what the stage shows: {kind, ...}
 let preview = null;         // selected (not yet saved) mood/poke in the lists
 let selectedFriendId = store.get('selFriend', null);
 
-const myCode = () => store.get('me', null);
+const myCode = () => (HOST ? hostMe.code : store.get('me', null));
 const friend = () => social.friend(selectedFriendId) || social.friends[0] || null;
 const nameOf = (id) => (id === 'me' ? settings.name : (social.friend(id) || { name: 'a former friend' }).name);
 const codeOf = (id) => (id === 'me' ? myCode() : (social.friend(id) || {}).code || null);
@@ -234,8 +249,9 @@ function saveMood() {
   const id = preview && preview.type === 'mood' ? preview.id : myMood.id;
   const comment = $('#mood-comment').value.trim();
   myMood = { id, comment };
-  store.set('myMood', myMood);
+  if (!HOST) store.set('myMood', myMood);
   social.setMood(id, comment);
+  notifyHost('saved');
   preview = null;
   $('#mood-comment').value = ''; updateCounter($('#mood-comment'));
   $('#mood-hint').textContent = 'Mood saved.';
@@ -321,11 +337,16 @@ function renderFriends() {
     b.addEventListener('click', () => selectFriend(fr.id));
     strip.appendChild(b);
   }
-  const add = document.createElement('button');
-  add.className = 'friend-chip';
-  add.innerHTML = '<span class="add">+</span><span>Add friend</span>';
-  add.addEventListener('click', () => addFriendMenu(add));
-  strip.appendChild(add);
+  // In host mode friends are the member's friends on the site, managed there.
+  if (!HOST) {
+    const add = document.createElement('button');
+    add.className = 'friend-chip';
+    add.innerHTML = '<span class="add">+</span><span>Add friend</span>';
+    add.addEventListener('click', () => addFriendMenu(add));
+    strip.appendChild(add);
+  } else if (!social.friends.length) {
+    strip.insertAdjacentHTML('beforeend', '<p class="host-note">Add friends on Kuddes to poke them here.</p>');
+  }
 
   $('#friend-card').hidden = !f;
   if (f) {
@@ -377,6 +398,12 @@ function friendMoreMenu(anchor) {
   if (!f) return;
   const wrap = document.createElement('div');
   wrap.className = 'menu';
+  if (HOST) {
+    wrap.innerHTML = `<h3>${esc(f.name)}</h3><button data-a="profile">View profile</button>`;
+    wrap.querySelector('[data-a=profile]').addEventListener('click', () => { popover.close(); notifyHost('open-profile', { username: f.id }); });
+    popover.open(anchor, wrap);
+    return;
+  }
   wrap.innerHTML = `<h3>${esc(f.name)}</h3>
     <button data-a="rename">Rename…</button>
     <button data-a="random">Randomize look</button>
@@ -408,6 +435,8 @@ function friendMoreMenu(anchor) {
 }
 
 function initFriends() {
+  // A friend's look is theirs to choose in host mode
+  if (HOST) $('#friend-edit').hidden = true;
   $('#friend-view').addEventListener('click', () => { const f = friend(); if (f) showView({ kind: 'friendMood', friendId: f.id }); });
   $('#friend-edit').addEventListener('click', () => { setAppearanceTarget('friend'); showTab('appearance'); });
   $('#friend-more').addEventListener('click', (e) => friendMoreMenu(e.currentTarget));
@@ -505,6 +534,7 @@ function setAppearanceTarget(who) {
   if (renderer.mode === 'customize') enterCustomize();
 }
 for (const b of $$('.who-tabs button')) b.addEventListener('click', () => setAppearanceTarget(b.dataset.target));
+if (HOST) $('.who-tabs').hidden = true;
 
 const targetBuddy = () => (appearanceTarget === 'friend' ? renderer.buddy2 : renderer.buddy1);
 
@@ -531,9 +561,15 @@ function leaveCustomizeStage() {
 
 $('#app-done').addEventListener('click', () => showTab('mood'));
 
+let hostSaveTimer = null;
 async function saveAppearance() {
   const me = await renderer.buddy1.serializeCompressed();
-  store.set('me', me);
+  if (HOST) {
+    hostMe.code = me;
+    // Customizing fires on every click; save once the member pauses
+    clearTimeout(hostSaveTimer);
+    hostSaveTimer = setTimeout(() => saveHostBuddy({ code: me }).then(() => notifyHost('saved')).catch(() => toast('Could not save your buddy')), 800);
+  } else store.set('me', me);
   cast.b1 = me;
   const f = friend();
   if (f && appearanceTarget === 'friend') {
@@ -914,6 +950,12 @@ function initSettings() {
   if (fname) fname.closest('label').hidden = true; // friends are managed on the Friends tab now
   fps.value = String(settings.fps); tex.value = String(settings.texScale); bg.value = settings.bg;
   code.value = myCode() || '';
+  if (HOST) {
+    // The name is the member's name on the site; friends and history live there too
+    name.disabled = true;
+    $('#code-apply-friend').hidden = true;
+    $('#reset-all').hidden = true;
+  }
   name.addEventListener('change', () => {
     settings.name = name.value.trim() || 'Buddy';
     saveSettings();
@@ -938,7 +980,8 @@ function initSettings() {
       const { decodeBuddyString } = await import('./buddy.js');
       JSON.parse(await decodeBuddyString(v));
     } catch { return toast('That code could not be read'); }
-    if (target === 'me') { store.set('me', v); cast.b1 = undefined; }
+    if (target === 'me' && HOST) { hostMe.code = v; cast.b1 = undefined; saveHostBuddy({ code: v }).then(() => notifyHost('saved')); }
+    else if (target === 'me') { store.set('me', v); cast.b1 = undefined; }
     else if (friend()) social.updateFriend(friend().id, { code: v });
     if (view) showView(view);
     toast('Appearance applied');
@@ -981,12 +1024,27 @@ async function boot() {
       $('#loading-text').textContent = msg;
       $('#loading-bar').style.width = Math.round(p * 100) + '%';
     });
-    if (!myCode()) { await renderer.buddy1.deserializeCompressed(null); store.set('me', await renderer.buddy1.serializeCompressed()); }
-    social = new Social({
+    const socialOptions = {
       moods: MOODS, pokes: POKES, randomCode,
       isMoodAvailable: (m) => renderer.moodAvailable(m),
       isPokeAvailable: (p) => renderer.pokeAvailable(p),
-    });
+    };
+    if (HOST) {
+      $('#loading-text').textContent = 'Loading your friends…';
+      const withUser = params.get('with');
+      const data = await fetchHostData(withUser);
+      hostMe = data.me;
+      settings.name = hostMe.name;
+      myMood = { id: hostMe.mood || 'm_hppy', comment: hostMe.comment || '' };
+      if (withUser) selectedFriendId = withUser.toLowerCase();
+      if (!myCode()) { await renderer.buddy1.deserializeCompressed(null); hostMe.code = await renderer.buddy1.serializeCompressed(); saveHostBuddy({ code: hostMe.code }); }
+      social = new HostSocial(socialOptions, data);
+      social.withUser = withUser;
+      social.on((type, msg) => { if (type === 'error') toast(msg); });
+    } else {
+      if (!myCode()) { await renderer.buddy1.deserializeCompressed(null); store.set('me', await renderer.buddy1.serializeCompressed()); }
+      social = new Social(socialOptions);
+    }
     await social.init();
     social.on(onSocial);
     window.bpSocial = social; // for debugging
@@ -1013,6 +1071,8 @@ async function boot() {
     if (!moodDef(myMood.id) || !renderer.moodAvailable(moodDef(myMood.id))) myMood = { id: firstMood(), comment: '' };
     showMyMood();
     social.start();
+    // "Poke!" on a profile opens the app on the Friends tab with that member picked
+    if (HOST && params.get('tab')) showTab(params.get('tab'));
     if (social.data.unread) toast(`You have ${social.data.unread} new poke${social.data.unread > 1 ? 's' : ''}`, { label: 'Show', onClick: () => showTab('home') });
   } catch (e) {
     console.error(e);

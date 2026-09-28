@@ -264,6 +264,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .history .priv { font-size: 10px; color: #999; }
 
 .friend-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 4px 8px; }
+.host-note { margin: 8px 4px; color: #777; font-size: 12px; }
 .friend-chip {
   flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 3px;
   border: 1px solid transparent; border-radius: 4px; background: none; padding: 4px 2px; cursor: pointer; font-size: 10px; color: #333;
