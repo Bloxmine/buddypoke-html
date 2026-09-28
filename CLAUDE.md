@@ -19,7 +19,7 @@ HTML5 port of the BuddyPoke Flash app: plain ES modules, no build step, no runti
 - `js/paper.js`: 3D Paper Buddies (port of `PaperDolls`/`PaperDollItem`): a second `Buddy` built from the paper geometry with the real buddy's `materialOptions`, rendered with the orthographic camera path at 150 DPI, laid out on pages and written to PDF.
 - `js/app.js` + `js/ui/`: page UI. `ui/customize.js` is the appearance editor, `ui/widgets.js` has the popover and toast.
 - `js/data/`: generated from the decompiled AS by `tools/build_data.py`. Do not hand-edit; change the generator (it also appends the Background options).
-- `assets/`: `chick.bin` (content package from the July 2009 app), `anims_v1.bin` (BuddyPoke 1.0 animation library), `anims_extra.bin` (standalone CDN animations), `icons.swf` (picker thumbnails), `presets.json`, `paperbuddy.bin`, `library.json` (from `tools/build_library.py`), `icons.png` (16×16 icon sheet, 7 per row).
+- `assets/`: `chick.bin` (content package from the July 2009 app), `anims_v1.bin` (BuddyPoke 1.0 animation library), `anims_extra.bin` (standalone CDN animations), `icons.swf` (picker thumbnails), `bkg.swf` (the Feb 2009 material SWF: the July 2009 package lists the panel backgrounds but lacks their `Bkg_*` artwork, so `MediaLibrary.swfFor` falls back to it), `presets.json`, `paperbuddy.bin`, `library.json` (from `tools/build_library.py`), `icons.png` (16×16 icon sheet, 7 per row).
 - Content version: the port uses the July 2009 data (`extract/v2`). The originally supplied SWF (Feb 2009) is only the source of the ported code; its data formats are identical.
 
 ## Things that are easy to get wrong

@@ -24,27 +24,41 @@ export class MediaLibrary {
     this.symbolCanvasCache = new Map();
   }
 
-  async init(swfBytes, libraryJson, iconSwfBytes = null) {
+  async init(swfBytes, libraryJson, iconSwfBytes = null, bkgSwfBytes = null) {
     this.swf = await SWF.load(swfBytes);
     // Picker thumbnails (Icon_* / Char_* symbols). The July 2009 app keeps
     // them in a separate SWF embedded in the Customization window.
     this.iconSwf = iconSwfBytes ? await SWF.load(iconSwfBytes) : null;
+    // The panel backgrounds (Bkg_* symbols) are listed in the July 2009
+    // catalog but their artwork isn't in its material SWF; the Feb 2009
+    // material SWF (assets/bkg.swf) still has it.
+    this.bkgSwf = bkgSwfBytes ? await SWF.load(bkgSwfBytes).catch(() => null) : null;
     this.library = libraryJson;
     this.frameRate = this.swf.frameRate;
   }
 
-  hasSymbol(name) { return this.swf.symbols.has(name); }
+  // The SWF that has a symbol: the package's own, or the background fallback.
+  swfFor(name) {
+    if (this.swf.symbols.has(name)) return this.swf;
+    if (this.bkgSwf && this.bkgSwf.symbols.has(name)) return this.bkgSwf;
+    return null;
+  }
+
+  hasSymbol(name) { return this.swfFor(name) !== null; }
 
   // Equivalent of getSymbol(): a fresh display object for a linked class.
   getSymbol(name) {
     if (name == null) return null;
-    const id = this.swf.symbols.get(name);
-    if (id === undefined) return null;
-    const inst = createInstance(this.swf, id);
+    const swf = this.swfFor(name);
+    if (!swf) return null;
+    const id = swf.symbols.get(name);
+    const inst = createInstance(swf, id);
     if (inst == null) return null;
-    const ch = this.swf.characters.get(id);
-    if (ch.kind === 'bitmap') {
-      const holder = new MovieClip(this.swf, null);
+    const ch = swf.characters.get(id);
+    // Bitmaps need a clip around them; so do fallback symbols, so that
+    // rasterize() renders them against their own SWF (bitmap fills).
+    if (ch.kind === 'bitmap' || swf !== this.swf) {
+      const holder = new MovieClip(swf, null);
       holder.addChild(inst);
       return holder;
     }
@@ -134,7 +148,7 @@ export class MediaLibrary {
     const c = makeCanvas(Math.ceil(w * s), Math.ceil(h * s));
     const ctx = c.getContext('2d');
     if (frame !== 1) MovieClip.advanceToFrame(obj, frame);
-    renderDisplayObject(ctx, obj, { a: s, b: 0, c: 0, d: s, tx: 0, ty: 0 }, IDENTITY_CX, this.swf);
+    renderDisplayObject(ctx, obj, { a: s, b: 0, c: 0, d: s, tx: 0, ty: 0 }, IDENTITY_CX, obj.swf || this.swf);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     return c;
   }
@@ -291,7 +305,7 @@ export class MediaLibrary {
   hasIcon(name) { return (this.iconSwf && this.iconSwf.symbols.has(name)) || this.hasSymbol(name); }
 
   renderIcon(name, size = 36) {
-    const swf = this.iconSwf && this.iconSwf.symbols.has(name) ? this.iconSwf : this.swf;
+    const swf = this.iconSwf && this.iconSwf.symbols.has(name) ? this.iconSwf : this.swfFor(name) || this.swf;
     const id = swf.symbols.get(name);
     const sym = id === undefined ? null : createInstance(swf, id);
     if (!sym) return null;

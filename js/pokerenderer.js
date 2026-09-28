@@ -32,18 +32,19 @@ export class BuddyPokeRenderer {
 
   async load(progress = () => {}) {
     progress('Loading content…', 0.05);
-    const [pkgBytes, v1Bytes, extraBytes, libJson, iconBytes] = await Promise.all([
+    const [pkgBytes, v1Bytes, extraBytes, libJson, iconBytes, bkgBytes] = await Promise.all([
       fetchBytes('assets/chick.bin'),
       fetchBytes('assets/anims_v1.bin').catch(() => null),
       fetchBytes('assets/anims_extra.bin').catch(() => null),
       fetch('assets/library.json').then((r) => r.json()),
       fetchBytes('assets/icons.swf').catch(() => null),
+      fetchBytes('assets/bkg.swf').catch(() => null),
     ]);
     progress('Unpacking model…', 0.25);
     const pkg = await parsePackage(pkgBytes);
     progress('Loading textures…', 0.45);
     this.matLib = new MediaLibrary();
-    await this.matLib.init(pkg.m, libJson, iconBytes);
+    await this.matLib.init(pkg.m, libJson, iconBytes, bkgBytes);
     progress('Loading animations…', 0.65);
     const animSources = [{ name: 'embedded', bytes: pkg.a, override: true }];
     const { inflate } = await import('./bytearray.js');
