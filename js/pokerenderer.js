@@ -28,6 +28,7 @@ export class BuddyPokeRenderer {
   }
 
   on(ev, fn) { (this.listeners[ev] || (this.listeners[ev] = [])).push(fn); }
+  off(ev, fn) { this.listeners[ev] = (this.listeners[ev] || []).filter((f) => f !== fn); }
   emit(ev, ...a) { for (const f of this.listeners[ev] || []) f(...a); }
 
   async load(progress = () => {}) {
