@@ -64,6 +64,12 @@ const nameB = (n) => `<b>${esc(n)}</b>`;
 // ------------------------------------------------------------ setup
 const canvas = $('#buddy-canvas');
 const stage = $('#stage');
+// Without WebGL the renderer can't be made: say so, instead of an endless "Loading…"
+// (the Kuddes page sees "could not start" and shows its own message)
+if (!document.createElement('canvas').getContext('webgl')) {
+  document.getElementById('loading-text').textContent = 'BuddyPoke could not start: WebGL is not available on this computer.';
+  throw new Error('WebGL not available');
+}
 const renderer = new BuddyPokeRenderer(canvas);
 setTextureScale(settings.texScale);
 renderer.fps = settings.fps;
