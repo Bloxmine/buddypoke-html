@@ -85,7 +85,13 @@ export class SceneObject {
     if (animToPlay) this.selectedAnim = animToPlay;
   }
 
-  hasAnimation(name) { return name != null && this.animNameToAnim[name] != null; }
+  // Only animations that can be decoded: the standalone CDN files for
+  // apologize1/2 carry target indices into a table that was never archived
+  // (and no bounds), so they can't play.
+  hasAnimation(name) {
+    const a = name != null ? this.animNameToAnim[name] : null;
+    return a != null && (a.targets || (a.lib && a.lib.targets)) != null && (a.bounds || (a.lib && a.lib.bounds)) != null;
+  }
 
   getAnimationByName(name) {
     if (name == null) return null;

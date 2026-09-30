@@ -51,7 +51,7 @@ Any other static host (Netlify, Cloudflare Pages, a normal web server) works the
 | `js/paper.js` | Port of `PaperDolls` / `PaperDollItem` (3D Paper Buddies) and a small PDF writer |
 | `assets/chick.bin` | The buddy content package from the July 2009 app (model, texture SWF, catalog, animations) |
 | `assets/anims_v1.bin` | 94 animations recovered from the archived BuddyPoke 1.0 SWF (`buddypoke.s3.amazonaws.com/swf/1.0/BuddyPokeOrkut.swf`) |
-| `assets/anims_extra.bin` | Standalone animations found on the archived MySpace CDN (`apologize1/2`) |
+| `assets/anims_extra.bin` | Standalone animations found on the archived MySpace CDN (`apologize1/2`; they can't play, see below) |
 | `assets/icons.swf` | Customisation thumbnails (from the Customization window SWF) |
 | `assets/presets.json` | The 75 preset buddies (from the Customization window SWF) |
 | `assets/paperbuddy.bin` | The Paper Buddies package (unfolded meshes, fold-line templates) |
@@ -62,7 +62,7 @@ All state (your buddy, friends, history, gold, pictures) is saved in `localStora
 
 ## Known gaps
 
-- **Locked moods and pokes**: their animations were streamed from `cache01-widget01.myspacecdn.com` and aren't in the Wayback Machine. 40 of 138 moods and 52 of 269 pokes work. All 545 archived files from that CDN folder were checked; only `apologize1/2` were new.
+- **Missing moods and pokes**: their animations were streamed from `cache01-widget01.myspacecdn.com` and aren't in the Wayback Machine, so they're left out of the lists (`Buddy.hasAnimation`). 40 of 138 moods and 51 of 269 pokes work. All 545 archived files from that CDN folder were checked; only `apologize1/2` were new, and those can't play either: they carry no targets, channels or bounds of their own, and their target indices (up to 88) point into a shared table that wasn't archived. The zombie dance (`dance_mJackB`) is among the missing ones; the zombie mood and pokes use the 1.0 `mood_zombie`, a limping shamble on the spot (it has no hip translation, so it doesn't walk across the stage).
 - **Scene backgrounds** for moods and pokes (café, T-rex, dance floor…) came from the same servers and are missing. The customisable background under Appearance works.
 - **Social features are simulated**: friends are made up and live only in your browser. Nothing is sent anywhere.
 

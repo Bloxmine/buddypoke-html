@@ -53,7 +53,6 @@ const premiumId = (item) => (item.cost && item.free !== '1' ? 'p' + (item.pid ||
 const premiumPrice = (item) => Number(item.cost) * GOLD_PER_COIN;
 const isUnlocked = (item) => { const id = premiumId(item); return !id || social.owns(id); };
 
-const LOCK_SVG = '<svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true"><path d="M3.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="#c9c9c9" stroke-width="1.6"/><rect x="1.5" y="7" width="11" height="8" rx="1.5" fill="#e4e4e4" stroke="#c9c9c9"/></svg>';
 
 const fill = (tpl, a, b) => String(tpl || '').replace('%1', a).replace('%2', b).replace('%', a);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -189,26 +188,24 @@ function buildCatTabs(root, cats, list, onChange) {
   return () => active;
 }
 
-function buildList(ul, list, available, onPick, cat, type) {
+// Only what can actually play: animations that were streamed from MySpace's
+// (long gone) servers are left out, not shown locked.
+function buildList(ul, list, onPick, cat, type) {
   ul.innerHTML = '';
   for (const item of list) {
     if (cat && (Number(item.cat) & cat) === 0) continue;
-    const ok = available(item);
     const li = document.createElement('li');
     li.dataset.id = item.id;
-    li.className = ok ? '' : 'locked';
-    li.title = ok ? item.desc.replace('%', type === 'poke' ? (friend() ? friend().name : 'your friend') : settings.name) : 'Locked: this animation was streamed from MySpace servers that no longer exist.';
-    const needsGold = ok && !isUnlocked(item);
+    li.title = item.desc.replace('%', type === 'poke' ? (friend() ? friend().name : 'your friend') : settings.name);
+    const needsGold = !isUnlocked(item);
     const price = needsGold ? `<span class="price"><i class="coin sm"></i>${premiumPrice(item)}</span>` : '';
-    li.innerHTML = `<span class="lock">${ok ? '' : LOCK_SVG}</span><span class="radio"></span><i class="ico" style="${iconStyle(Number(item.icon) || 0)}"></i><span class="name">${esc(item.name)}</span>${price}`;
+    li.innerHTML = `<span class="radio"></span><i class="ico" style="${iconStyle(Number(item.icon) || 0)}"></i><span class="name">${esc(item.name)}</span>${price}`;
     if (needsGold) li.title = `Unlock “${item.name}” for ${premiumPrice(item)} gold. Once unlocked, you may use it as many times as you like.`;
-    if (ok) {
-      li.tabIndex = 0;
-      li.setAttribute('role', 'radio');
-      const pick = () => (isUnlocked(item) ? onPick(item.id) : offerUnlock(item, () => onPick(item.id)));
-      li.addEventListener('click', pick);
-      li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
-    }
+    li.tabIndex = 0;
+    li.setAttribute('role', 'radio');
+    const pick = () => (isUnlocked(item) ? onPick(item.id) : offerUnlock(item, () => onPick(item.id)));
+    li.addEventListener('click', pick);
+    li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
     ul.appendChild(li);
   }
   markCurrent();
@@ -216,8 +213,10 @@ function buildList(ul, list, available, onPick, cat, type) {
 
 let moodCat = () => 0;
 let pokeCat = () => 0;
-const refreshMoodList = () => buildList($('#mood-list'), MOODS.list, (m) => renderer.moodAvailable(m), previewMood, moodCat(), 'mood');
-const refreshPokeList = () => buildList($('#poke-list'), POKES.list, (p) => renderer.pokeAvailable(p), previewPoke, pokeCat(), 'poke');
+const playableMoods = () => MOODS.list.filter((m) => renderer.moodAvailable(m));
+const playablePokes = () => POKES.list.filter((p) => renderer.pokeAvailable(p));
+const refreshMoodList = () => buildList($('#mood-list'), playableMoods(), previewMood, moodCat(), 'mood');
+const refreshPokeList = () => buildList($('#poke-list'), playablePokes(), previewPoke, pokeCat(), 'poke');
 
 // The original BuyFeatureWindow: confirm, pay, then use it forever.
 function offerUnlock(item, then) {
@@ -279,8 +278,8 @@ function sendPoke() {
 function updateCounter(input) { $(`.count[data-for="${input.id}"]`).textContent = input.value.length + '/100'; }
 
 function initLists() {
-  moodCat = buildCatTabs($('#mood-cats'), MOOD_CATS, MOODS.list, refreshMoodList);
-  pokeCat = buildCatTabs($('#poke-cats'), POKE_CATS, POKES.list, refreshPokeList);
+  moodCat = buildCatTabs($('#mood-cats'), MOOD_CATS, playableMoods(), refreshMoodList);
+  pokeCat = buildCatTabs($('#poke-cats'), POKE_CATS, playablePokes(), refreshPokeList);
   refreshMoodList();
   refreshPokeList();
   for (const input of $$('.comment input')) input.addEventListener('input', () => updateCounter(input));
